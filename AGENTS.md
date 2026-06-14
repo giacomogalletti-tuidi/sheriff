@@ -35,6 +35,8 @@ sheriff/
 ├── AGENTS.md                      # ← you are here (AI context hub)
 ├── README.md                      # human-facing overview + run instructions
 ├── docs/                          # AUTONOMOUS_WORKFLOW / ARCHITECTURE / PROTOCOL / GAME_RULES / IMPROVEMENTS / PLAYTEST_REPORT / FABLE5_PROMPT
+├── sheriff_shared/                # shared card catalog (single source of truth)
+│   └── lib/card_data.dart
 ├── sheriff_server/
 │   └── bin/server.dart            # the whole server: Room state + phase machine + WS + static file serving
 │   └── tool/smoke_test.dart       # headless 3-bot end-to-end game simulator (autonomous e2e check)
@@ -100,10 +102,10 @@ All checks above (`dart/flutter analyze`, `dart/flutter test`, the simulator, an
 
 - **Cards are strings on the wire** (`"apple"`, `"crossbow"`), end-to-end. The
   `GameCard`/`CardCatalog` types are for display/lookup, not the protocol.
-- **Players are keyed by name** (no stable id / auth). Many bugs stem from this —
-  see IMPROVEMENTS.
-- **Card stats live in 3 places** and can drift: `server.dart`,
-  `models/card.dart`, `widgets/good_card.dart`. Change all three together.
+- **Card stats live in `sheriff_shared/lib/card_data.dart`** (imported by server
+  and client). UI colors/icons remain in `widgets/good_card.dart`.
+- **Players are keyed by name** with a per-session **reconnect token** issued on
+  create/join. Names must be unique within a room.
 - **The protocol is a hand-maintained contract.** If you change a message shape,
   update the server, the client (`game_controller.dart`), **and**
   [docs/PROTOCOL.md](docs/PROTOCOL.md).

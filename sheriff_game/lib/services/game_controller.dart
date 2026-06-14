@@ -9,6 +9,7 @@ class GameController extends ChangeNotifier {
 
   String playerName = '';
   String roomId = '';
+  String reconnectToken = '';
 
   // Lobby state
   List<String> players = [];
@@ -45,7 +46,9 @@ class GameController extends ChangeNotifier {
   Map<String, String> inspectionDecisions = {};
   List<Map<String, dynamic>> chatMessages = [];
   Map<String, Map<String, dynamic>> pendingBribes = {};
-  List<Map<String, dynamic>> inspectionResults = [];
+  Map<String, Map<String, dynamic>> inspectionResultsByPlayer = {};
+  List<Map<String, dynamic>> get inspectionResults =>
+      inspectionResultsByPlayer.values.toList();
 
   // End game
   List<Map<String, dynamic>> finalScores = [];
@@ -64,11 +67,13 @@ class GameController extends ChangeNotifier {
     switch (type) {
       case 'room_created':
         roomId = msg['roomId'] as String;
+        reconnectToken = msg['token'] as String? ?? reconnectToken;
         errorMessage = null;
         break;
 
       case 'room_joined':
         roomId = msg['roomId'] as String;
+        reconnectToken = msg['token'] as String? ?? reconnectToken;
         errorMessage = null;
         break;
 
@@ -121,11 +126,12 @@ class GameController extends ChangeNotifier {
         break;
 
       case 'inspection_result':
-        inspectionResults.add(msg);
+        final player = msg['player'] as String;
+        inspectionResultsByPlayer[player] = msg;
         if (msg['inspected'] == false) {
-          inspectionDecisions[msg['player'] as String] = 'pass';
+          inspectionDecisions[player] = 'pass';
         } else {
-          inspectionDecisions[msg['player'] as String] = 'inspect';
+          inspectionDecisions[player] = 'inspect';
         }
         break;
 
@@ -164,6 +170,7 @@ class GameController extends ChangeNotifier {
             'type': 'reconnect',
             'name': playerName,
             'roomId': roomId,
+            'token': reconnectToken,
           });
         }
         break;
@@ -173,7 +180,11 @@ class GameController extends ChangeNotifier {
   }
 
   void _updateGameState(Map<String, dynamic> msg) {
-    phase = gamePhaseFromString(msg['phase'] ?? 'lobby');
+    final newPhase = gamePhaseFromString(msg['phase'] ?? 'lobby');
+    if (phase == GamePhase.inspection && newPhase != GamePhase.inspection) {
+      inspectionResultsByPlayer.clear();
+    }
+    phase = newPhase;
     round = msg['round'] as int? ?? 0;
     sheriff = msg['sheriff'] as String?;
     isSheriff = msg['isSheriff'] as bool? ?? false;
@@ -195,6 +206,10 @@ class GameController extends ChangeNotifier {
 
     marketDone = List<String>.from(msg['marketDone'] ?? []);
     bagLoaded = List<String>.from(msg['bagLoaded'] ?? []);
+
+    if (msg.containsKey('myBag')) {
+      myBag = List<String>.from(msg['myBag'] ?? []);
+    }
 
     if (msg.containsKey('declarations')) {
       final decls = msg['declarations'] as Map<String, dynamic>? ?? {};
@@ -219,7 +234,6 @@ class GameController extends ChangeNotifier {
       );
     }
 
-    inspectionResults.clear();
     disconnectMessage = null;
     countdown = null;
   }
@@ -233,7 +247,12 @@ class GameController extends ChangeNotifier {
 
   void joinRoom(String name, String room) {
     playerName = name;
-    ws.send({'type': 'join', 'roomId': room, 'name': name});
+    ws.send({
+      'type': 'join',
+      'roomId': room,
+      'name': name,
+      if (reconnectToken.isNotEmpty) 'token': reconnectToken,
+    });
   }
 
   void toggleReady() {

@@ -5,7 +5,7 @@ import 'package:sheriff_game/models/game_state.dart';
 void main() {
   group('GameCard', () {
     test('fromJson and toJson roundtrip', () {
-      const card = CardCatalog.apple;
+      final card = CardCatalog.apple;
       final json = card.toJson();
       final restored = GameCard.fromJson(json);
 

@@ -11,114 +11,61 @@ Legend: 🔴 bug / correctness · 🟠 robustness / security · 🟡 maintainabi
 
 ## P0 — Correctness bugs (fix first)
 
-### 🔴 Reconnecting mid-game loses your bag
-`buildGameStateFor` (server) never includes the recipient's own `bag`. `myBag`
-is only set by the one-shot `bag_loaded` message. A merchant who reconnects
-during **declaration** is stuck: `myBag` is empty → `bagCount == 0` → the
-"Declare" button is disabled (`declaration_screen.dart`), so they can only wait
-for the 30s auto-declare. They also can't see their bag during inspection.
-- **Fix:** add the player's own `bag` to `buildGameStateFor` in the
-  declaration/inspection branches; have the client read `myBag` from `game_state`.
-- Files: `sheriff_server/bin/server.dart` (`buildGameStateFor`),
-  `sheriff_game/lib/services/game_controller.dart` (`_updateGameState`).
+_All P0 items below were fixed 2026-06-15._
 
-### 🔴 Market action isn't validated server-side → hand can exceed 6 / cheating
-`handleMarketAction` trusts the client: it draws one card per `drawSources`
-entry with no check that `drawSources.length <= discards.length`, and there is
-**no cap at 6** before the top-up loop. A crafted client can inflate its hand or
-draw extra contraband. The UI enforces the rule, the server does not.
-- **Fix:** validate `drawSources.length == discards.length` (or ≤), validate that
-  each discarded card is actually in hand, and clamp the final hand to 6.
-- File: `sheriff_server/bin/server.dart` (`handleMarketAction`).
+### ~~🔴 Reconnecting mid-game loses your bag~~ ✅ Fixed
+`buildGameStateFor` now includes `myBag` during declaration/inspection; the client
+reads it from `game_state`.
 
-### 🔴 Duplicate / colliding player names
-Neither `create` nor `join` (in lobby) checks that a name is unique. Two players
-named "Bob" break everything: state is keyed by name (`gold`, `hands`, `bags`,
-`merchantStands`, …) and `socketFor` uses `playerNames.indexOf(name)` which
-returns the **first** match.
-- **Fix:** reject duplicate names on join/create, or assign a stable per-player
-  id (see P1 identity item).
-- File: `sheriff_server/bin/server.dart` (`_handleCreate`, `_handleJoin`).
+### ~~🔴 Market action isn't validated server-side~~ ✅ Fixed
+`handleMarketAction` validates discard ownership, `drawSources.length == discards.length`,
+and clamps the hand to 6.
+
+### ~~🔴 Duplicate / colliding player names~~ ✅ Fixed
+Create/join reject duplicate names (case-insensitive) and invalid lengths.
 
 ---
 
 ## P1 — Robustness & security
 
-### 🟠 Name-based identity allows seat hijacking
-A player is just a name. Anyone who knows the room code and a player's name can
-`join`/`reconnect` as them (during a game, `join` with an existing name is
-treated as a reconnect). There is no token or auth.
-- **Fix:** issue a random reconnect token (e.g. `uuid`, already a dependency) on
-  create/join; require it on reconnect. Keep names for display only.
-- Files: `server.dart` (`_handleJoin`, `_handleReconnect`, `handleReconnect`),
-  `game_controller.dart` (persist + resend token).
+### ~~🟠 Name-based identity allows seat hijacking~~ ✅ Fixed
+Server issues a random reconnect `token` on create/join; reconnect requires it.
 
-### 🟠 Finished rooms leak forever
-`rooms` only deletes a room when it becomes empty **in lobby**. After
-`gameOver`, the `Room` (sockets, timers, state) stays in memory indefinitely.
-- **Fix:** delete the room (and cancel timers) on game over and when the last
-  socket for a finished room closes; add a periodic sweep / room TTL.
-- File: `server.dart` (`broadcastFinalScores`, `_handleDisconnect`).
+### ~~🟠 Finished rooms leak forever~~ ✅ Fixed
+Rooms are deleted when the last client disconnects after `gameOver`, plus a 1h TTL
+sweep and `Room.dispose()` cancels timers.
 
-### 🟠 Deck regeneration duplicates cards
-When the draw pile and reshuffle are both exhausted, `drawCard` calls
-`generateDeck()`, creating a fresh 204-card deck while copies already sit in
-hands/bags/stands — breaking card conservation.
-- **Fix:** reshuffle only real discards; if still empty, draw from a controlled
-  pool or end the round gracefully instead of fabricating cards.
-- File: `server.dart` (`drawCard`, `reshuffleDeckIfNeeded`, `generateDeck`).
+### ~~🟠 Deck regeneration duplicates cards~~ ✅ Fixed
+`drawCard` no longer calls `generateDeck()` when empty; returns `null` instead.
 
-### 🟠 Unbounded reconnect retries
-`_attemptReconnect` retries every 2s forever with no backoff or cap, and
-duplicates the `listen` setup from `connect`.
-- **Fix:** exponential backoff with a max, and extract the shared listen handler.
-- File: `sheriff_game/lib/services/websocket_service.dart`.
+### ~~🟠 Unbounded reconnect retries~~ ✅ Fixed
+Exponential backoff (2s→60s cap, 30 attempts max); shared listen handler extracted.
 
-### 🟠 No input limits on names / chat
-Names and chat text are unbounded and unsanitized (no XSS risk in Flutter's
-`Text`, but spam/oversized payloads are possible). No chat rate limiting.
-- **Fix:** length caps + trim on the server; basic rate limit on `chat`.
-- File: `server.dart` (`_handleCreate`/`_handleJoin`, `handleChat`).
+### ~~🟠 No input limits on names / chat~~ ✅ Fixed
+Names trimmed and capped at 20 chars; chat capped at 500 chars with rate limiting
+(5 msgs / 10s per player).
 
-### 🟠 Hardcoded WS fallback for native builds
-On non-web targets the WebSocket URL falls back to `ws://localhost:8080/ws`.
-There's no configuration for pointing a mobile/desktop build at a real server.
-- **Fix:** make the server URL configurable (build-time `--dart-define` or a
-  settings field in the lobby).
-- File: `sheriff_game/lib/screens/lobby_screen.dart` (`_getWebSocketUrl`).
+### ~~🟠 Hardcoded WS fallback for native builds~~ ✅ Fixed
+Optional server URL field in lobby + `--dart-define=SHERIFF_WS_URL=...`.
 
 ---
 
 ## P2 — Maintainability
 
-### 🟡 Card data duplicated in 3 places (single source of truth)
-Card values/penalties/types live in `server.dart` (`cardValues`,
-`deckComposition`, `kingBonus`, `queenBonus`), `sheriff_game/lib/models/card.dart`
-(`CardCatalog`), and partially in `widgets/good_card.dart` (contraband set,
-colors, icons). They can drift silently.
-- **Fix:** one source of truth — e.g. a small **shared Dart package** imported by
-  both projects, or a generated `card_data.dart` from a single JSON.
-- Files: the three above.
+### ~~🟡 Card data duplicated in 3 places~~ ✅ Fixed
+Single source of truth in `sheriff_shared/lib/card_data.dart` (imported by server
+and client). UI colors/icons remain in `good_card.dart`.
 
-### 🟡 Unused dependencies / dead tooling
-`pubspec.yaml` declares `json_annotation`, `json_serializable`, `build_runner`,
-and `uuid`, but JSON is hand-written (no `.g.dart`, no `part` directives) and
-`uuid` appears unused on the client.
-- **Fix:** either adopt codegen for the models or drop the unused deps. (Keep
-  `uuid` if you implement reconnect tokens.)
-- File: `sheriff_game/pubspec.yaml`.
+### ~~🟡 Unused dependencies / dead tooling~~ ✅ Fixed
+Removed unused `uuid`, `json_annotation`, `json_serializable`, and `build_runner`
+from the client. Server uses `uuid` for reconnect tokens.
 
 ### 🟡 Default Flutter README, no project-level docs
 `sheriff_game/README.md` is the untouched template. (This `docs/` set + root
 `AGENTS.md`/`README.md` now address project-level docs.)
 
-### 🟡 `inspectionResults` cleared on every `game_state`
-`_updateGameState` calls `inspectionResults.clear()`. It's safe today only
-because the server doesn't broadcast `game_state` mid-inspection — a fragile
-implicit coupling.
-- **Fix:** track inspection results keyed by player and derive the list, instead
-  of clearing on state updates.
-- File: `sheriff_game/lib/services/game_controller.dart`.
+### ~~🟡 `inspectionResults` cleared on every `game_state`~~ ✅ Fixed
+Results keyed by player; cleared only when leaving the inspection phase.
 
 ---
 

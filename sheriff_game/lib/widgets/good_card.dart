@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sheriff_shared/card_data.dart' as shared;
 
 class GoodCard extends StatelessWidget {
   final String name;
@@ -40,8 +41,7 @@ class GoodCard extends StatelessWidget {
     'mead': Icons.local_drink,
   };
 
-  static bool isContraband(String name) =>
-      name == 'pepper' || name == 'silk' || name == 'crossbow' || name == 'mead';
+  static bool isContraband(String name) => shared.isContraband(name);
 
   @override
   Widget build(BuildContext context) {

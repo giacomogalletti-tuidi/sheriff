@@ -22,10 +22,11 @@ and update this file.
 - **Keepalive:** the client sends `{"type":"ping"}` every **10s**; the server
   replies `{"type":"pong"}`. Both are filtered out before reaching app logic.
 - **Auto-reconnect:** if the socket drops, the client emits a synthetic
-  `connection_closed` to its own UI, retries every **2s**, and on success emits
-  a synthetic `connection_restored` and re-sends a `reconnect` message.
-- **Identity is the player name + room id.** There is no token. Reconnecting =
-  sending `join`/`reconnect` with the same `name` and `roomId`.
+  `connection_closed` to its own UI, retries with **exponential backoff** (2s base,
+  max 60s, up to 30 attempts), and on success emits a synthetic
+  `connection_restored` and re-sends a `reconnect` message.
+- **Identity:** each player receives a random **`token`** on create/join. Reconnecting
+  requires matching `name`, `roomId`, and `token` (names are display-only).
 
 ---
 
@@ -34,9 +35,9 @@ and update this file.
 | `type`          | Fields                                                                 | When / effect |
 |-----------------|-----------------------------------------------------------------------|---------------|
 | `ping`          | —                                                                     | Keepalive; server replies `pong`. |
-| `create`        | `name: string`                                                        | Create a new room; sender becomes player 1. |
-| `join`          | `name: string`, `roomId: string`                                      | Join a room in lobby; if game in progress and name already exists, treated as reconnect. |
-| `reconnect`     | `name: string`, `roomId: string`                                      | Re-attach an existing player to a new socket. |
+| `create`        | `name: string`                                                        | Create a new room; sender becomes player 1. Server replies with `token`. |
+| `join`          | `name: string`, `roomId: string`, `token?: string`                    | Join a lobby (unique name, 1–20 chars). Mid-game reconnect requires matching `token`. |
+| `reconnect`     | `name: string`, `roomId: string`, `token: string`                     | Re-attach an existing player to a new socket. |
 | `ready`         | —                                                                     | Mark self ready in lobby. |
 | `unready`       | —                                                                     | Cancel ready (also cancels countdown). |
 | `market_action` | `discards: string[]`, `drawSources: string[]` (`"discard1"`/`"discard2"`/`"deck"`), `discardTarget: string` (`"discard1"`/`"discard2"`) | Submit market exchange. |
@@ -62,8 +63,8 @@ Server-side guards (selected):
 | `type`               | Key fields | Meaning |
 |----------------------|-----------|---------|
 | `pong`               | —         | Keepalive reply (filtered by client). |
-| `room_created`       | `roomId`  | Room created; you are in the lobby. |
-| `room_joined`        | `roomId`  | You joined a lobby. |
+| `room_created`       | `roomId`, `token` | Room created; you are in the lobby. |
+| `room_joined`        | `roomId`, `token` | You joined a lobby. |
 | `error`              | `message` | Generic error (room not found, full, in progress…). |
 | `lobby_state`        | `players: string[]`, `ready: string[]`, `phase` | Lobby roster snapshot. |
 | `countdown`          | `value: int` | Pre-game countdown tick (5→1). |
@@ -110,14 +111,11 @@ Phase-conditional additions:
 
 - **market / loadBag:** `hand`, `marketDone`
 - **loadBag:** `bagLoaded`
-- **declaration / inspection:** `declarations`, `declared`; merchants also get `hand`
+- **declaration / inspection:** `declarations`, `declared`; merchants also get `hand` and **`myBag`** (own sealed bag, for reconnect)
 - **inspection:** `inspectionDecisions`, `chatMessages`, `pendingBribes`; the Sheriff also gets `hand`
 
 > **Hidden information is preserved:** only **legal** goods on a stand are sent to
 > other players (`merchantStands`), while the true total is sent as a count
-> (`merchantStandCounts`). Bags are never revealed until resolution.
->
-> ⚠️ **Known gap:** `game_state` never includes the recipient's own **bag**.
-> `myBag` is only set by the one-shot `bag_loaded` message, so a merchant who
-> reconnects during declaration/inspection loses their bag view. See
-> [IMPROVEMENTS.md](IMPROVEMENTS.md).
+> (`merchantStandCounts`). Other players' bags are never revealed until resolution.
+> Each merchant receives their own **`myBag`** in `game_state` during
+> declaration/inspection (including after reconnect).

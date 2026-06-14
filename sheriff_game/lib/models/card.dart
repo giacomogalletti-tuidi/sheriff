@@ -1,3 +1,7 @@
+import 'package:sheriff_shared/card_data.dart' as shared;
+
+export 'package:sheriff_shared/card_data.dart';
+
 enum CardType { legal, contraband }
 
 class GameCard {
@@ -42,59 +46,32 @@ class GameCard {
 }
 
 class CardCatalog {
-  static const apple = GameCard(
-    name: 'apple', type: CardType.legal, value: 2, penalty: 2,
-  );
-  static const cheese = GameCard(
-    name: 'cheese', type: CardType.legal, value: 3, penalty: 2,
-  );
-  static const bread = GameCard(
-    name: 'bread', type: CardType.legal, value: 3, penalty: 2,
-  );
-  static const chicken = GameCard(
-    name: 'chicken', type: CardType.legal, value: 4, penalty: 2,
-  );
-  static const pepper = GameCard(
-    name: 'pepper', type: CardType.contraband, value: 6, penalty: 4,
-  );
-  static const silk = GameCard(
-    name: 'silk', type: CardType.contraband, value: 5, penalty: 4,
-  );
-  static const crossbow = GameCard(
-    name: 'crossbow', type: CardType.contraband, value: 9, penalty: 4,
-  );
-  static const mead = GameCard(
-    name: 'mead', type: CardType.contraband, value: 7, penalty: 4,
-  );
+  static GameCard _fromShared(String name) {
+    final stats = shared.cardValues[name]!;
+    return GameCard(
+      name: name,
+      type: stats['type'] == 'legal' ? CardType.legal : CardType.contraband,
+      value: stats['value'] as int,
+      penalty: stats['penalty'] as int,
+    );
+  }
 
-  static const legalGoods = [apple, cheese, bread, chicken];
-  static const contrabandGoods = [pepper, silk, crossbow, mead];
-  static const allGoods = [...legalGoods, ...contrabandGoods];
+  static final apple = _fromShared('apple');
+  static final cheese = _fromShared('cheese');
+  static final bread = _fromShared('bread');
+  static final chicken = _fromShared('chicken');
+  static final pepper = _fromShared('pepper');
+  static final silk = _fromShared('silk');
+  static final crossbow = _fromShared('crossbow');
+  static final mead = _fromShared('mead');
 
-  static const deckComposition = {
-    'apple': 48,
-    'cheese': 36,
-    'bread': 36,
-    'chicken': 24,
-    'pepper': 22,
-    'silk': 21,
-    'crossbow': 12,
-    'mead': 5,
-  };
+  static final legalGoods = [apple, cheese, bread, chicken];
+  static final contrabandGoods = [pepper, silk, crossbow, mead];
+  static final allGoods = [...legalGoods, ...contrabandGoods];
 
-  static const kingBonus = {
-    'apple': 20,
-    'cheese': 15,
-    'bread': 15,
-    'chicken': 10,
-  };
-
-  static const queenBonus = {
-    'apple': 10,
-    'cheese': 10,
-    'bread': 10,
-    'chicken': 5,
-  };
+  static Map<String, int> get deckComposition => shared.deckComposition;
+  static Map<String, int> get kingBonus => shared.kingBonus;
+  static Map<String, int> get queenBonus => shared.queenBonus;
 
   static GameCard byName(String name) {
     return allGoods.firstWhere((c) => c.name == name);

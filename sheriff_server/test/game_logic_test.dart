@@ -72,8 +72,19 @@ void main() {
       room.generateDeck();
       final initialSize = room.deck.length;
 
-      room.drawCard();
+      final drawn = room.drawCard();
+      expect(drawn, isNotNull);
       expect(room.deck.length, initialSize - 1);
+    });
+
+    test('drawCard returns null when deck is empty (no regeneration)', () {
+      final room = Room('test');
+      room.deck = [];
+      room.discardPile1 = [];
+      room.discardPile2 = [];
+
+      expect(room.drawCard(), isNull);
+      expect(room.deck, isEmpty);
     });
 
     test('reshuffleDeckIfNeeded replenishes deck from discard piles', () {
@@ -152,6 +163,65 @@ void main() {
       expect(room.gold['A'], 0);
       expect(room.gold['B'], 53);
       expect(room.merchantStands['A']!.length, lessThan(2));
+    });
+  });
+
+  group('Player names', () {
+    test('normalizePlayerName rejects empty, too long, and duplicates', () {
+      expect(normalizePlayerName(''), isNull);
+      expect(normalizePlayerName('  '), isNull);
+      expect(normalizePlayerName('a' * 21), isNull);
+      expect(normalizePlayerName('Alice', existingNames: ['alice']), isNull);
+      expect(normalizePlayerName(' Bob ', existingNames: ['Cara']), 'Bob');
+    });
+  });
+
+  group('Market validation', () {
+    test('rejects draw count mismatch and invalid discards', () {
+      final room = Room('test');
+      room.generateDeck();
+      room.playerNames.addAll(['Sheriff', 'Merchant']);
+      room.currentSheriffIndex = 0;
+      room.phase = GamePhase.market;
+      room.hands['Merchant'] = ['apple', 'cheese', 'bread', 'chicken', 'pepper', 'silk'];
+
+      room.handleMarketAction('Merchant', {
+        'discards': ['apple'],
+        'drawSources': ['deck', 'deck'],
+        'discardTarget': 'discard1',
+      });
+      expect(room.marketDone, isEmpty);
+      expect(room.hands['Merchant']!.length, 6);
+
+      room.handleMarketAction('Merchant', {
+        'discards': ['apple', 'not_in_hand'],
+        'drawSources': ['deck', 'deck'],
+        'discardTarget': 'discard1',
+      });
+      expect(room.marketDone, isEmpty);
+
+      room.handleMarketAction('Merchant', {
+        'discards': ['apple', 'cheese'],
+        'drawSources': ['deck', 'deck'],
+        'discardTarget': 'discard1',
+      });
+      expect(room.marketDone, contains('Merchant'));
+      expect(room.hands['Merchant']!.length, 6);
+    });
+  });
+
+  group('Reconnect state', () {
+    test('buildGameStateFor includes myBag during declaration', () {
+      final room = Room('test');
+      room.playerNames.addAll(['Sheriff', 'Merchant']);
+      room.currentSheriffIndex = 0;
+      room.phase = GamePhase.declaration;
+      room.bags['Merchant'] = ['apple', 'apple', 'pepper'];
+      room.gold = {'Sheriff': 50, 'Merchant': 50};
+      room.merchantStands = {'Sheriff': [], 'Merchant': []};
+
+      final state = room.buildGameStateFor('Merchant');
+      expect(state['myBag'], ['apple', 'apple', 'pepper']);
     });
   });
 

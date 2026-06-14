@@ -1,8 +1,14 @@
 name: sheriff_server
 description: A simple WebSocket server for Sheriff of Nottingham
 version: 1.0.0
+publish_to: none
 environment:
   sdk: '>=2.19.0 <4.0.0'
+
+dependencies:
+  uuid: ^4.0.0
+  sheriff_shared:
+    path: ../sheriff_shared
 
 dev_dependencies:
   test: ^1.24.0

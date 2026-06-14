@@ -20,7 +20,13 @@ class LobbyScreen extends StatefulWidget {
 class _LobbyScreenState extends State<LobbyScreen> {
   final _nameController = TextEditingController();
   final _roomController = TextEditingController();
+  final _serverUrlController = TextEditingController();
   bool _connected = false;
+
+  static const _defaultWsUrl = String.fromEnvironment(
+    'SHERIFF_WS_URL',
+    defaultValue: '',
+  );
 
   @override
   void initState() {
@@ -44,6 +50,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   String _getWebSocketUrl() {
+    final custom = _serverUrlController.text.trim();
+    if (custom.isNotEmpty) {
+      return custom.endsWith('/ws') ? custom : '$custom/ws';
+    }
+    if (_defaultWsUrl.isNotEmpty) {
+      return _defaultWsUrl.endsWith('/ws') ? _defaultWsUrl : '$_defaultWsUrl/ws';
+    }
     try {
       final uri = Uri.base;
       final scheme = uri.scheme == 'https' ? 'wss' : 'ws';
@@ -80,6 +93,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
     widget.controller.removeListener(_onStateChange);
     _nameController.dispose();
     _roomController.dispose();
+    _serverUrlController.dispose();
     super.dispose();
   }
 
@@ -118,6 +132,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Your name',
                       prefixIcon: Icon(Icons.person),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _serverUrlController,
+                    decoration: const InputDecoration(
+                      labelText: 'Server URL (optional)',
+                      hintText: 'ws://host:8080/ws',
+                      prefixIcon: Icon(Icons.dns),
                       border: OutlineInputBorder(),
                     ),
                   ),

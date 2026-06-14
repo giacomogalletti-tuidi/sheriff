@@ -3,40 +3,37 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:sheriff_shared/card_data.dart';
+import 'package:uuid/uuid.dart';
+
+export 'package:sheriff_shared/card_data.dart';
+
 // ---------------------------------------------------------------------------
-// Card catalog (mirrors client-side CardCatalog)
+// Input limits
 // ---------------------------------------------------------------------------
 
-const cardValues = {
-  'apple': {'value': 2, 'penalty': 2, 'type': 'legal'},
-  'cheese': {'value': 3, 'penalty': 2, 'type': 'legal'},
-  'bread': {'value': 3, 'penalty': 2, 'type': 'legal'},
-  'chicken': {'value': 4, 'penalty': 2, 'type': 'legal'},
-  'pepper': {'value': 6, 'penalty': 4, 'type': 'contraband'},
-  'silk': {'value': 5, 'penalty': 4, 'type': 'contraband'},
-  'crossbow': {'value': 9, 'penalty': 4, 'type': 'contraband'},
-  'mead': {'value': 7, 'penalty': 4, 'type': 'contraband'},
-};
+const maxNameLength = 20;
+const maxChatLength = 500;
+const _chatRateLimitCount = 5;
+const _chatRateLimitWindow = Duration(seconds: 10);
+const _roomFinishedTtl = Duration(hours: 1);
 
-const deckComposition = {
-  'apple': 48,
-  'cheese': 36,
-  'bread': 36,
-  'chicken': 24,
-  'pepper': 22,
-  'silk': 21,
-  'crossbow': 12,
-  'mead': 5,
-};
+const _uuid = Uuid();
 
-const legalTypes = ['apple', 'cheese', 'bread', 'chicken'];
+String? normalizePlayerName(String? raw, {Iterable<String>? existingNames}) {
+  if (raw == null) return null;
+  final name = raw.trim();
+  if (name.isEmpty || name.length > maxNameLength) return null;
+  if (existingNames != null) {
+    final lower = name.toLowerCase();
+    for (final existing in existingNames) {
+      if (existing.toLowerCase() == lower) return null;
+    }
+  }
+  return name;
+}
 
-const kingBonus = {'apple': 20, 'cheese': 15, 'bread': 15, 'chicken': 10};
-const queenBonus = {'apple': 10, 'cheese': 10, 'bread': 10, 'chicken': 5};
-
-bool isLegal(String name) => cardValues[name]?['type'] == 'legal';
-int cardValue(String name) => (cardValues[name]?['value'] ?? 0) as int;
-int cardPenalty(String name) => (cardValues[name]?['penalty'] ?? 0) as int;
+String issuePlayerToken() => _uuid.v4();
 
 // ---------------------------------------------------------------------------
 // Game phase
@@ -64,6 +61,7 @@ class Room {
   Map<String, Map<String, dynamic>> declarations = {};
   Map<String, List<String>> merchantStands = {};
   Map<String, int> gold = {};
+  Map<String, String> playerTokens = {};
 
   Set<String> marketDone = {};
   Set<String> bagLoaded = {};
@@ -80,9 +78,24 @@ class Room {
   Timer? countdownTimer;
   Timer? disconnectTimer;
   Timer? phaseTimer;
+  Timer? _roomCleanupTimer;
   int countdown = 5;
+  DateTime? finishedAt;
+
+  final Map<String, List<DateTime>> _chatTimestamps = {};
 
   Room(this.id);
+
+  void dispose() {
+    countdownTimer?.cancel();
+    phaseTimer?.cancel();
+    disconnectTimer?.cancel();
+    _roomCleanupTimer?.cancel();
+    for (final t in _disconnectTimers.values) {
+      t.cancel();
+    }
+    _disconnectTimers.clear();
+  }
 
   // ---- Deck management ----
 
@@ -113,11 +126,9 @@ class Room {
     discardPile2 = kept2;
   }
 
-  String drawCard() {
+  String? drawCard() {
     reshuffleDeckIfNeeded();
-    if (deck.isEmpty) {
-      generateDeck();
-    }
+    if (deck.isEmpty) return null;
     return deck.removeLast();
   }
 
@@ -219,8 +230,16 @@ class Room {
       hands[p] = [];
     }
 
-    discardPile1 = List.generate(5, (_) => drawCard());
-    discardPile2 = List.generate(5, (_) => drawCard());
+    discardPile1 = [];
+    discardPile2 = [];
+    for (var i = 0; i < 5; i++) {
+      final c = drawCard();
+      if (c != null) discardPile1.add(c);
+    }
+    for (var i = 0; i < 5; i++) {
+      final c = drawCard();
+      if (c != null) discardPile2.add(c);
+    }
 
     dealInitialHands();
     startNewRound();
@@ -228,7 +247,12 @@ class Room {
 
   void dealInitialHands() {
     for (final p in playerNames) {
-      hands[p] = List.generate(6, (_) => drawCard());
+      final hand = <String>[];
+      for (var i = 0; i < 6; i++) {
+        final c = drawCard();
+        if (c != null) hand.add(c);
+      }
+      hands[p] = hand;
     }
   }
 
@@ -277,7 +301,12 @@ class Room {
         processEndOfRound();
         break;
       case GamePhase.gameOver:
+        finishedAt = DateTime.now();
         broadcastFinalScores();
+        _roomCleanupTimer?.cancel();
+        _roomCleanupTimer = Timer(_roomFinishedTtl, () {
+          rooms.remove(id);
+        });
         break;
       default:
         break;
@@ -329,6 +358,10 @@ class Room {
       state['declared'] = declared.toList();
       if (!isSheriff) {
         state['hand'] = hands[player] ?? [];
+        final bag = bags[player];
+        if (bag != null && bag.isNotEmpty) {
+          state['myBag'] = bag;
+        }
       }
     }
 
@@ -354,10 +387,13 @@ class Room {
     final discards = List<String>.from(msg['discards'] ?? []);
     final drawSources = List<String>.from(msg['drawSources'] ?? []);
 
-    final hand = hands[player] ?? [];
+    if (drawSources.length != discards.length) return;
+
+    final hand = List<String>.from(hands[player] ?? []);
+    final handCopy = List<String>.from(hand);
 
     for (final card in discards) {
-      hand.remove(card);
+      if (!handCopy.remove(card)) return;
     }
 
     for (final source in drawSources) {
@@ -366,14 +402,22 @@ class Room {
         drawn = discardPile1.removeLast();
       } else if (source == 'discard2' && discardPile2.isNotEmpty) {
         drawn = discardPile2.removeLast();
-      } else {
+      } else if (source == 'deck') {
         drawn = drawCard();
+      } else {
+        return;
       }
-      hand.add(drawn);
+      if (drawn != null) hand.add(drawn);
     }
 
     while (hand.length < 6) {
-      hand.add(drawCard());
+      final drawn = drawCard();
+      if (drawn == null) break;
+      hand.add(drawn);
+    }
+
+    if (hand.length > 6) {
+      hand.removeRange(6, hand.length);
     }
 
     final targetPile = (msg['discardTarget'] ?? 'discard1') == 'discard2'
@@ -395,7 +439,9 @@ class Room {
     for (final p in merchants) {
       final hand = hands[p] ?? [];
       while (hand.length < 6) {
-        hand.add(drawCard());
+        final drawn = drawCard();
+        if (drawn == null) break;
+        hand.add(drawn);
       }
       hands[p] = hand;
     }
@@ -483,8 +529,9 @@ class Room {
 
   void handleChat(String player, Map<String, dynamic> msg) {
     if (phase != GamePhase.inspection) return;
-    final text = msg['text'] as String? ?? '';
-    if (text.trim().isEmpty) return;
+    final text = (msg['text'] as String? ?? '').trim();
+    if (text.isEmpty || text.length > maxChatLength) return;
+    if (!_checkChatRateLimit(player)) return;
 
     final chatMsg = {
       'from': player,
@@ -493,6 +540,15 @@ class Room {
     };
     chatMessages.add(chatMsg);
     broadcast({'type': 'chat_message', ...chatMsg});
+  }
+
+  bool _checkChatRateLimit(String player) {
+    final now = DateTime.now();
+    final timestamps = _chatTimestamps.putIfAbsent(player, () => []);
+    timestamps.removeWhere((t) => now.difference(t) > _chatRateLimitWindow);
+    if (timestamps.length >= _chatRateLimitCount) return false;
+    timestamps.add(now);
+    return true;
   }
 
   void handleBribeOffer(String player, Map<String, dynamic> msg) {
@@ -979,6 +1035,18 @@ void main() async {
     print('Serving web app from: $webDir');
   }
 
+  Timer.periodic(const Duration(minutes: 5), (_) {
+    final now = DateTime.now();
+    rooms.removeWhere((_, room) {
+      if (room.finishedAt != null &&
+          now.difference(room.finishedAt!) >= _roomFinishedTtl) {
+        room.dispose();
+        return true;
+      }
+      return false;
+    });
+  });
+
   await for (HttpRequest req in server) {
     if (req.uri.path == '/ws' && WebSocketTransformer.isUpgradeRequest(req)) {
       final socket = await WebSocketTransformer.upgrade(req);
@@ -1107,26 +1175,30 @@ void _serveStaticFile(HttpRequest req, String webDir) {
 }
 
 void _handleCreate(WebSocket socket, Map<String, dynamic> msg) {
-  final name = msg['name'] as String?;
-  if (name == null || name.trim().isEmpty) return;
+  final name = normalizePlayerName(msg['name'] as String?);
+  if (name == null) {
+    socket.add(jsonEncode({'type': 'error', 'message': 'Invalid player name (1–$maxNameLength chars)'}));
+    return;
+  }
 
   final roomId = _generateRoomId();
   final room = Room(roomId);
   rooms[roomId] = room;
 
+  final token = issuePlayerToken();
   room.clients.add(socket);
   room.playerNames.add(name);
+  room.playerTokens[name] = token;
   clientRoomMap[socket] = roomId;
   clientNameMap[socket] = name;
 
-  socket.add(jsonEncode({'type': 'room_created', 'roomId': roomId}));
+  socket.add(jsonEncode({'type': 'room_created', 'roomId': roomId, 'token': token}));
   room.broadcastLobbyState();
 }
 
 void _handleJoin(WebSocket socket, Map<String, dynamic> msg) {
-  final name = msg['name'] as String?;
   final roomId = msg['roomId'] as String?;
-  if (name == null || roomId == null) return;
+  if (roomId == null) return;
 
   final room = rooms[roomId];
   if (room == null) {
@@ -1134,10 +1206,27 @@ void _handleJoin(WebSocket socket, Map<String, dynamic> msg) {
     return;
   }
 
-  if (room.phase != GamePhase.lobby && room.playerNames.contains(name)) {
+  final rawName = msg['name'] as String?;
+  final token = msg['token'] as String?;
+
+  if (room.phase != GamePhase.lobby && room.playerNames.contains(rawName?.trim())) {
+    final name = rawName!.trim();
+    if (token == null || room.playerTokens[name] != token) {
+      socket.add(jsonEncode({'type': 'error', 'message': 'Invalid reconnect token'}));
+      return;
+    }
     clientRoomMap[socket] = roomId;
     clientNameMap[socket] = name;
     room.handleReconnect(name, socket);
+    return;
+  }
+
+  final name = normalizePlayerName(rawName, existingNames: room.playerNames);
+  if (name == null) {
+    socket.add(jsonEncode({
+      'type': 'error',
+      'message': 'Invalid or duplicate player name (1–$maxNameLength chars, must be unique)',
+    }));
     return;
   }
 
@@ -1151,12 +1240,14 @@ void _handleJoin(WebSocket socket, Map<String, dynamic> msg) {
     return;
   }
 
+  final newToken = issuePlayerToken();
   room.clients.add(socket);
   room.playerNames.add(name);
+  room.playerTokens[name] = newToken;
   clientRoomMap[socket] = roomId;
   clientNameMap[socket] = name;
 
-  socket.add(jsonEncode({'type': 'room_joined', 'roomId': roomId}));
+  socket.add(jsonEncode({'type': 'room_joined', 'roomId': roomId, 'token': newToken}));
   room.broadcastLobbyState();
 }
 
@@ -1175,15 +1266,19 @@ void _handleReadyToggle(WebSocket socket, String type) {
 void _handleReconnect(WebSocket socket, Map<String, dynamic> msg) {
   final name = msg['name'] as String?;
   final roomId = msg['roomId'] as String?;
-  if (name == null || roomId == null) return;
+  final token = msg['token'] as String?;
+  if (name == null || roomId == null || token == null) return;
 
   final room = rooms[roomId];
   if (room == null) return;
 
-  if (room.playerNames.contains(name)) {
+  final trimmed = name.trim();
+  if (room.playerNames.contains(trimmed) && room.playerTokens[trimmed] == token) {
     clientRoomMap[socket] = roomId;
-    clientNameMap[socket] = name;
-    room.handleReconnect(name, socket);
+    clientNameMap[socket] = trimmed;
+    room.handleReconnect(trimmed, socket);
+  } else {
+    socket.add(jsonEncode({'type': 'error', 'message': 'Invalid reconnect token'}));
   }
 }
 
@@ -1235,10 +1330,19 @@ void _handleDisconnect(WebSocket socket) {
   if (room.phase == GamePhase.lobby) {
     room.clients.remove(socket);
     room.playerNames.remove(player);
+    room.playerTokens.remove(player);
     room.readyPlayers.remove(player);
     room.broadcastLobbyState();
 
     if (room.playerNames.isEmpty) {
+      room.dispose();
+      rooms.remove(roomId);
+    }
+  } else if (room.phase == GamePhase.gameOver) {
+    final idx = room.clients.indexOf(socket);
+    if (idx >= 0) room.clients.removeAt(idx);
+    if (room.clients.isEmpty) {
+      room.dispose();
       rooms.remove(roomId);
     }
   } else {
