@@ -1,0 +1,8 @@
+name: sheriff_server
+description: A simple WebSocket server for Sheriff of Nottingham
+version: 1.0.0
+environment:
+  sdk: '>=2.19.0 <4.0.0'
+
+dev_dependencies:
+  test: ^1.24.0

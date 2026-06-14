@@ -1,0 +1,22 @@
+Project context for AI assistants lives in AGENTS.md (repo root) and the docs/
+folder. Read AGENTS.md first; it is the canonical, vendor-neutral onboarding
+file.
+
+Key references:
+- AGENTS.md ............ overview, project map, how to run, key facts & conventions
+- docs/ARCHITECTURE.md . components, data flow, phase machine, deployment
+- docs/PROTOCOL.md ..... WebSocket message contract (client <-> server)
+- docs/GAME_RULES.md ... rules as implemented, constants, scoring
+- docs/IMPROVEMENTS.md . prioritized bugs / refactors / features (what to work on)
+
+Rules of engagement:
+- This is "Sheriff of Nottingham": a Flutter client (sheriff_game/) + an
+  authoritative pure-Dart WebSocket server (sheriff_server/bin/server.dart).
+- The server is authoritative: put validation and game rules on the server, keep
+  the client thin (it renders game_state and sends intents).
+- Cards are plain strings on the wire ("apple", "crossbow").
+- Card stats are duplicated in server.dart, models/card.dart and
+  widgets/good_card.dart — change all three together.
+- If you change a message shape, update server + game_controller.dart + docs/PROTOCOL.md.
+- There is no git yet — make careful, additive changes.
+- Update the relevant docs/ file in the same change as the code.

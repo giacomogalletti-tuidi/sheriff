@@ -1,0 +1,31 @@
+# Root .gitignore for the Sheriff monorepo (Flutter client + Dart server).
+# Run `git init` at the repo root, then this keeps generated noise out of history
+# (which also keeps AI assistants focused on real source).
+
+# Dart / Flutter build + tooling
+**/.dart_tool/
+**/build/
+**/.packages
+**/pubspec_overrides.yaml
+.flutter-plugins
+.flutter-plugins-dependencies
+**/generated_plugin_registrant.dart
+**/*.g.dart        # remove this line if you adopt json_serializable codegen
+
+# IDE / editor
+.vs/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / local env
+*.log
+.env
+.env.*
