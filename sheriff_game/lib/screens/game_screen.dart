@@ -4,6 +4,7 @@ import '../services/game_controller.dart';
 import '../models/game_state.dart';
 import '../widgets/game_top_bar.dart';
 import '../widgets/merchant_stand.dart';
+import '../widgets/my_goods_panel.dart';
 import 'market_screen.dart';
 import 'load_bag_screen.dart';
 import 'declaration_screen.dart';
@@ -24,6 +25,8 @@ class GameScreen extends StatelessWidget {
           body: Column(
             children: [
               const GameTopBar(),
+              if (ctrl.phase != GamePhase.gameOver && ctrl.phase != GamePhase.lobby)
+                const MyGoodsPanel(),
               if (ctrl.disconnectMessage != null)
                 Container(
                   width: double.infinity,
@@ -69,10 +72,11 @@ class GameScreen extends StatelessWidget {
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
                   final player = ctrl.players[i];
+                  final isMe = player == ctrl.playerName;
                   return MerchantStand(
                     playerName: player,
-                    visibleGoods: ctrl.merchantStands[player] ?? [],
-                    totalCount: ctrl.merchantStandCounts[player] ?? 0,
+                    visibleGoods: isMe ? ctrl.myStand : (ctrl.merchantStands[player] ?? []),
+                    totalCount: isMe ? ctrl.myStand.length : (ctrl.merchantStandCounts[player] ?? 0),
                     gold: ctrl.gold[player] ?? 0,
                     isSheriff: player == ctrl.sheriff,
                     isCurrentPlayer: player == ctrl.playerName,

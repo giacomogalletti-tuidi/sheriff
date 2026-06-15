@@ -57,6 +57,21 @@ class GameTopBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                Row(
+                  children: [
+                    Icon(Icons.person, size: 14, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        ctrl.playerName.isNotEmpty ? ctrl.playerName : '...',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
                 Text(
                   'Round ${ctrl.round}',
                   style: theme.textTheme.labelSmall,
@@ -65,10 +80,13 @@ class GameTopBar extends StatelessWidget {
                   children: [
                     Icon(Icons.shield, size: 14, color: Colors.amber.shade700),
                     const SizedBox(width: 4),
-                    Text(
-                      ctrl.sheriff ?? '...',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Text(
+                        ctrl.sheriff ?? '...',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (ctrl.isSheriff)

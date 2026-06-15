@@ -342,6 +342,7 @@ class Room {
       'discardPile1Top': discardPile1.isNotEmpty ? discardPile1.last : null,
       'discardPile2Top': discardPile2.isNotEmpty ? discardPile2.last : null,
       'deckCount': deck.length,
+      'myStand': merchantStands[player] ?? [],
     };
 
     if (phase == GamePhase.market || phase == GamePhase.loadBag) {
@@ -665,8 +666,9 @@ class Room {
         'wasHonest': true,
         'penaltyPaid': 0,
         'paidBy': '',
-        'cardsToStand': bag.where((c) => isLegal(c)).toList(),
+        'cardsToStand': List<String>.from(bag),
       });
+      _notifyStandUpdate(merchant);
       return;
     }
 
@@ -697,6 +699,7 @@ class Room {
         'paidBy': currentSheriff,
         'cardsToStand': bag,
       });
+      _notifyStandUpdate(merchant);
     } else {
       final confiscated = <String>[];
       final kept = <String>[];
@@ -735,7 +738,15 @@ class Room {
         'cardsToStand': kept,
         'confiscated': confiscated,
       });
+      _notifyStandUpdate(merchant);
     }
+  }
+
+  void _notifyStandUpdate(String merchant) {
+    sendTo(merchant, {
+      'type': 'stand_update',
+      'myStand': List<String>.from(merchantStands[merchant] ?? []),
+    });
   }
 
   void payGold(String from, String to, int amount) {

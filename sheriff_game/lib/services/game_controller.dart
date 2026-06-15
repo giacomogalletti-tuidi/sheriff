@@ -27,6 +27,7 @@ class GameController extends ChangeNotifier {
   List<String> hand = [];
   Map<String, List<String>> merchantStands = {};
   Map<String, int> merchantStandCounts = {};
+  List<String> myStand = [];
 
   // Market
   String? discardPile1Top;
@@ -135,6 +136,10 @@ class GameController extends ChangeNotifier {
         }
         break;
 
+      case 'stand_update':
+        myStand = List<String>.from(msg['myStand'] ?? []);
+        break;
+
       case 'round_summary':
         gold = Map<String, int>.from(msg['gold'] ?? {});
         myGold = gold[playerName] ?? 0;
@@ -142,6 +147,7 @@ class GameController extends ChangeNotifier {
         merchantStands = stands.map(
           (k, v) => MapEntry(k, List<String>.from(v as List)),
         );
+        myStand = List<String>.from(merchantStands[playerName] ?? []);
         break;
 
       case 'game_over':
@@ -188,6 +194,10 @@ class GameController extends ChangeNotifier {
     round = msg['round'] as int? ?? 0;
     sheriff = msg['sheriff'] as String?;
     isSheriff = msg['isSheriff'] as bool? ?? false;
+    if (msg.containsKey('myName')) {
+      final name = msg['myName'] as String?;
+      if (name != null && name.isNotEmpty) playerName = name;
+    }
     myGold = msg['myGold'] as int? ?? 0;
     gold = Map<String, int>.from(msg['gold'] ?? {});
     players = List<String>.from(msg['players'] ?? []);
@@ -199,6 +209,10 @@ class GameController extends ChangeNotifier {
       (k, v) => MapEntry(k, List<String>.from(v as List)),
     );
     merchantStandCounts = Map<String, int>.from(msg['merchantStandCounts'] ?? {});
+
+    if (msg.containsKey('myStand')) {
+      myStand = List<String>.from(msg['myStand'] ?? []);
+    }
 
     discardPile1Top = msg['discardPile1Top'] as String?;
     discardPile2Top = msg['discardPile2Top'] as String?;

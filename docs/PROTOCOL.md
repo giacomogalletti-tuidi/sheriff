@@ -80,6 +80,7 @@ Server-side guards (selected):
 | `game_over`          | `scores: ScoreBreakdown[]` | Final standings (sorted desc). |
 | `player_disconnected`| `player`, `message` | A player dropped; grace period started. |
 | `player_reconnected` | `player`  | A player came back. |
+| `stand_update`       | `myStand: string[]` | Your merchant stand changed (after customs resolution). |
 
 Client-only synthetic messages (never sent by the server, injected by
 `websocket_service.dart`): `connection_closed`, `connection_restored`.
@@ -103,7 +104,8 @@ Built by `Room.buildGameStateFor(player)`. Always includes:
   "merchantStandCounts": { /* per player: total stand size incl. contraband */ },
   "discardPile1Top": "apple",   // or null
   "discardPile2Top": "cheese",  // or null
-  "deckCount": 188
+  "deckCount": 188,
+  "myStand": ["apple", "cheese", "pepper"]   // full own stand (incl. contraband); always present
 }
 ```
 
