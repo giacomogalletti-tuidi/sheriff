@@ -105,11 +105,14 @@ Built by `Room.buildGameStateFor(player)`. Always includes:
   "discardPile1Top": "apple",   // or null
   "discardPile2Top": "cheese",  // or null
   "deckCount": 188,
-  "myStand": ["apple", "cheese", "pepper"]   // full own stand (incl. contraband); always present
+  "myStand": ["apple", "cheese", "pepper"],   // full own stand (incl. contraband); always present
+  "phaseDeadlineMs": 1710000000000            // epoch ms when current phase auto-advances; omitted if no timer
 }
 ```
 
-Phase-conditional additions:
+Phase timeouts (server auto-advances if players are slow): market **60s**, load bag **45s**,
+declaration **30s**, inspection **90s**. The client shows a live countdown from
+`phaseDeadlineMs` in the top bar.
 
 - **market / loadBag:** `hand`, `marketDone`
 - **loadBag:** `bagLoaded`

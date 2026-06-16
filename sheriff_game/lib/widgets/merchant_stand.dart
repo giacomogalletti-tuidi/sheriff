@@ -33,7 +33,7 @@ class MerchantStand extends StatelessWidget {
       decoration: BoxDecoration(
         color: isCurrentPlayer
             ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-            : Colors.white,
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSheriff ? Colors.amber : Colors.grey.shade300,

@@ -156,5 +156,6 @@ provides one — see `_getWebSocketUrl()` and the hardcoded-URL item in
 [IMPROVEMENTS.md](IMPROVEMENTS.md).
 
 There is **no TLS, no persistence, and no horizontal scaling** today: all state
-is in-process memory. A server restart drops every game. See
-[IMPROVEMENTS.md](IMPROVEMENTS.md) for hardening and deployment next steps.
+is in-process memory. A server restart drops every game. For online playtesting
+see **[DEPLOYMENT.md](DEPLOYMENT.md)** (Docker + Render/Fly.io). Further hardening
+is in [IMPROVEMENTS.md](IMPROVEMENTS.md).

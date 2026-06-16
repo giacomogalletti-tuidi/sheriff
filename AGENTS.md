@@ -26,7 +26,7 @@ Flutter **web** app, so one process can host everything.
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — components, data flow, phase machine, deployment.
 - **[docs/PROTOCOL.md](docs/PROTOCOL.md)** — every WebSocket message (client↔server) and the `game_state` shape.
 - **[docs/GAME_RULES.md](docs/GAME_RULES.md)** — rules *as implemented*, constants, scoring, house rules.
-- **[docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md)** — prioritized bugs, refactors, features, infra. **Start here for "what to work on".**
+- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — Docker image + free hosting (Render / Fly.io).
 
 ## Project map
 

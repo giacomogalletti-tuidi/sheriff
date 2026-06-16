@@ -1,0 +1,13 @@
+**/.dart_tool/
+**/build/
+**/.packages
+.git/
+.github/
+.idea/
+.vs/
+*.log
+.env
+.env.*
+docs/
+*.md
+!sheriff_game/README.md

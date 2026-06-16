@@ -81,6 +81,7 @@ class Room {
   Timer? _roomCleanupTimer;
   int countdown = 5;
   DateTime? finishedAt;
+  DateTime? phaseDeadline;
 
   final Map<String, List<DateTime>> _chatTimestamps = {};
 
@@ -280,26 +281,27 @@ class Room {
     phase = newPhase;
     phaseTimer?.cancel();
     phaseTimer = null;
+    phaseDeadline = null;
 
-    broadcastGameState();
-
+    Duration? timeout;
     switch (newPhase) {
       case GamePhase.market:
         sendHandsToMerchants();
-        _startPhaseTimeout(const Duration(seconds: 60));
+        timeout = const Duration(seconds: 60);
         break;
       case GamePhase.loadBag:
-        _startPhaseTimeout(const Duration(seconds: 45));
+        timeout = const Duration(seconds: 45);
         break;
       case GamePhase.declaration:
-        _startPhaseTimeout(const Duration(seconds: 30));
+        timeout = const Duration(seconds: 30);
         break;
       case GamePhase.inspection:
-        _startPhaseTimeout(const Duration(seconds: 90));
+        timeout = const Duration(seconds: 90);
         break;
       case GamePhase.endOfRound:
         processEndOfRound();
-        break;
+        broadcastGameState();
+        return;
       case GamePhase.gameOver:
         finishedAt = DateTime.now();
         broadcastFinalScores();
@@ -307,10 +309,18 @@ class Room {
         _roomCleanupTimer = Timer(_roomFinishedTtl, () {
           rooms.remove(id);
         });
-        break;
+        broadcastGameState();
+        return;
       default:
         break;
     }
+
+    if (timeout != null) {
+      phaseDeadline = DateTime.now().add(timeout);
+      phaseTimer = Timer(timeout, _onPhaseTimeout);
+    }
+
+    broadcastGameState();
   }
 
   void broadcastGameState() {
@@ -344,6 +354,10 @@ class Room {
       'deckCount': deck.length,
       'myStand': merchantStands[player] ?? [],
     };
+
+    if (phaseDeadline != null) {
+      state['phaseDeadlineMs'] = phaseDeadline!.millisecondsSinceEpoch;
+    }
 
     if (phase == GamePhase.market || phase == GamePhase.loadBag) {
       state['hand'] = hands[player] ?? [];
@@ -905,8 +919,13 @@ class Room {
 
   void _startPhaseTimeout(Duration duration) {
     phaseTimer?.cancel();
+    phaseDeadline = DateTime.now().add(duration);
     phaseTimer = Timer(duration, _onPhaseTimeout);
+    broadcastGameState();
   }
+
+  /// Kept for tests / extensions that start a timer outside [enterPhase].
+  void startPhaseTimeout(Duration duration) => _startPhaseTimeout(duration);
 
   void _onPhaseTimeout() {
     print('[ROOM $id] Phase timeout! phase=$phase, disconnected=$disconnectedPlayers');
@@ -1039,9 +1058,10 @@ String? _getPlayer(WebSocket socket) => clientNameMap[socket];
 
 void main() async {
   final webDir = _findWebBuildDir();
-  final server = await HttpServer.bind('0.0.0.0', 8080);
-  print('Server running on http://0.0.0.0:8080');
-  print('WebSocket endpoint: ws://0.0.0.0:8080/ws');
+  final port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 8080;
+  final server = await HttpServer.bind('0.0.0.0', port);
+  print('Server running on http://0.0.0.0:$port');
+  print('WebSocket endpoint: ws://0.0.0.0:$port/ws');
   if (webDir != null) {
     print('Serving web app from: $webDir');
   }
@@ -1122,7 +1142,15 @@ void _handleWebSocket(WebSocket socket) {
 }
 
 String? _findWebBuildDir() {
+  final fromEnv = Platform.environment['WEB_BUILD_DIR'];
+  if (fromEnv != null && fromEnv.isNotEmpty) {
+    final dir = Directory(fromEnv);
+    if (dir.existsSync() && File('${dir.path}/index.html').existsSync()) {
+      return dir.path;
+    }
+  }
   final candidates = [
+    '../web',
     '../sheriff_game/build/web',
     '../../sheriff_game/build/web',
     'sheriff_game/build/web',

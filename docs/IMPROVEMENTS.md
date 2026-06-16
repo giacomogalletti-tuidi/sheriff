@@ -115,8 +115,7 @@ that plays a full 3-player game over real WebSockets and asserts it reaches
 - **Root `.gitignore`** — exclude `build/`, `.dart_tool/`, `.vs/`, IDE files
   (a starter is included at the repo root).
 - **Dockerfile** — multi-stage: `flutter build web` → copy into a Dart runtime
-  serving `bin/server.dart`. The server already serves the web build, so this is
-  a clean single-container deploy.
+  serving `bin/server.dart`. See **[DEPLOYMENT.md](DEPLOYMENT.md)** for Render/Fly.io.
 - **CI** (GitHub Actions) — `dart test` (server), `flutter test` (client),
   `flutter build web`, `dart analyze`/`flutter analyze`.
 - **TLS / WSS** — terminate TLS at a reverse proxy (Caddy/nginx) and confirm

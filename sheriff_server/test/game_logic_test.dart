@@ -223,6 +223,19 @@ void main() {
       final state = room.buildGameStateFor('Merchant');
       expect(state['myBag'], ['apple', 'apple', 'pepper']);
     });
+
+    test('buildGameStateFor includes phaseDeadlineMs when phase timer active', () {
+      final room = Room('test');
+      room.playerNames.addAll(['A', 'B', 'C']);
+      room.phase = GamePhase.market;
+      room.phaseDeadline = DateTime.now().add(const Duration(seconds: 60));
+
+      final state = room.buildGameStateFor('A');
+      expect(state['phaseDeadlineMs'], isNotNull);
+      final deadline = DateTime.fromMillisecondsSinceEpoch(state['phaseDeadlineMs'] as int);
+      expect(deadline.isAfter(DateTime.now()), isTrue);
+      expect(deadline.difference(DateTime.now()).inSeconds, lessThanOrEqualTo(60));
+    });
   });
 
   group('Inspection resolution', () {

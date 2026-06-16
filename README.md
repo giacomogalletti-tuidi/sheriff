@@ -55,6 +55,7 @@ implemented: **[docs/GAME_RULES.md](docs/GAME_RULES.md)**.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the client/server fit together. |
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | WebSocket message contract. |
 | [docs/GAME_RULES.md](docs/GAME_RULES.md) | Rules, constants, scoring. |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker + free online hosting (Render). |
 | [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | Known bugs, roadmap, next steps. |
 
 ## Tests

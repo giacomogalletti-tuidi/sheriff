@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/game_controller.dart';
 import '../models/game_state.dart';
+import 'phase_countdown.dart';
+import 'all_players_stands_list.dart';
 
 class GameTopBar extends StatelessWidget {
   const GameTopBar({super.key});
@@ -48,92 +50,119 @@ class GameTopBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _PhaseIndicator(phase: phase, label: _phaseLabel(phase)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+          Row(
+            children: [
+              _PhaseIndicator(phase: phase, label: _phaseLabel(phase)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.person, size: 14, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        ctrl.playerName.isNotEmpty ? ctrl.playerName : '...',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    Row(
+                      children: [
+                        Icon(Icons.person, size: 14, color: theme.colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            ctrl.playerName.isNotEmpty ? ctrl.playerName : '...',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ],
+                    ),
+                    Text(
+                      'Round ${ctrl.round}',
+                      style: theme.textTheme.labelSmall,
+                    ),
+                    Row(
+                      children: [
+                        Icon(Icons.shield, size: 14, color: Colors.amber.shade700),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            ctrl.sheriff ?? '...',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (ctrl.isSheriff)
+                          Text(
+                            ' (you)',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.monetization_on, size: 16, color: Colors.amber.shade800),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${ctrl.myGold}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
                       ),
                     ),
                   ],
                 ),
-                Text(
-                  'Round ${ctrl.round}',
-                  style: theme.textTheme.labelSmall,
-                ),
-                Row(
-                  children: [
-                    Icon(Icons.shield, size: 14, color: Colors.amber.shade700),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        ctrl.sheriff ?? '...',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'All players\' goods',
+                child: InkWell(
+                  onTap: () => showAllPlayersStands(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
                     ),
-                    if (ctrl.isSheriff)
-                      Text(
-                        ' (you)',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontStyle: FontStyle.italic,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.people_outline, size: 18, color: theme.colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Stands',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade100,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.monetization_on, size: 16, color: Colors.amber.shade800),
-                const SizedBox(width: 4),
-                Text(
-                  '${ctrl.myGold}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber.shade900,
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => Scaffold.of(context).openEndDrawer(),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.storefront, size: 20, color: theme.colorScheme.primary),
-            ),
+            ],
           ),
+          if (ctrl.phaseDeadlineMs != null) ...[
+            const SizedBox(height: 8),
+            PhaseCountdown(deadlineMs: ctrl.phaseDeadlineMs, prominent: true),
+          ],
         ],
       ),
     );

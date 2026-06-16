@@ -54,6 +54,9 @@ class GameController extends ChangeNotifier {
   // End game
   List<Map<String, dynamic>> finalScores = [];
 
+  // Phase timer (server-authoritative deadline)
+  int? phaseDeadlineMs;
+
   // Disconnection
   String? disconnectMessage;
 
@@ -246,6 +249,12 @@ class GameController extends ChangeNotifier {
       pendingBribes = bribes.map(
         (k, v) => MapEntry(k, Map<String, dynamic>.from(v as Map)),
       );
+    }
+
+    if (msg.containsKey('phaseDeadlineMs')) {
+      phaseDeadlineMs = msg['phaseDeadlineMs'] as int?;
+    } else {
+      phaseDeadlineMs = null;
     }
 
     disconnectMessage = null;

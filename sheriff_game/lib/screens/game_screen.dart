@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/game_controller.dart';
 import '../models/game_state.dart';
 import '../widgets/game_top_bar.dart';
-import '../widgets/merchant_stand.dart';
+import '../widgets/all_players_stands_list.dart';
 import '../widgets/my_goods_panel.dart';
 import 'market_screen.dart';
 import 'load_bag_screen.dart';
@@ -52,6 +52,7 @@ class GameScreen extends StatelessWidget {
   }
 
   Widget _buildStandsDrawer(BuildContext context, GameController ctrl) {
+    final theme = Theme.of(context);
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -59,31 +60,23 @@ class GameScreen extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                'Merchant Stands',
-                style: Theme.of(context).textTheme.titleLarge,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Goods passed customs',
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'All players',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ],
               ),
             ),
-            const Divider(),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(12),
-                itemCount: ctrl.players.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, i) {
-                  final player = ctrl.players[i];
-                  final isMe = player == ctrl.playerName;
-                  return MerchantStand(
-                    playerName: player,
-                    visibleGoods: isMe ? ctrl.myStand : (ctrl.merchantStands[player] ?? []),
-                    totalCount: isMe ? ctrl.myStand.length : (ctrl.merchantStandCounts[player] ?? 0),
-                    gold: ctrl.gold[player] ?? 0,
-                    isSheriff: player == ctrl.sheriff,
-                    isCurrentPlayer: player == ctrl.playerName,
-                  );
-                },
-              ),
-            ),
+            const Divider(height: 1),
+            const Expanded(child: AllPlayersStandsList()),
           ],
         ),
       ),

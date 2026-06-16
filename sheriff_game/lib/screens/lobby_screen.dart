@@ -61,7 +61,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
       final uri = Uri.base;
       final scheme = uri.scheme == 'https' ? 'wss' : 'ws';
       final host = uri.host;
-      final port = (host == 'localhost' || host == '127.0.0.1') ? 8080 : uri.port;
+      if (host == 'localhost' || host == '127.0.0.1') {
+        return 'ws://$host:8080/ws';
+      }
+      final port = uri.port;
+      if (port == 80 || port == 443) {
+        return '$scheme://$host/ws';
+      }
       return '$scheme://$host:$port/ws';
     } catch (_) {
       return 'ws://localhost:8080/ws';

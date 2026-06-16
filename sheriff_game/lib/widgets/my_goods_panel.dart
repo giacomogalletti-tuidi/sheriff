@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/card.dart';
 import '../services/game_controller.dart';
 import 'good_card.dart';
+import 'all_players_stands_list.dart';
 
 /// Compact summary of goods the player has passed through customs (their stand).
 class MyGoodsPanel extends StatelessWidget {
@@ -54,6 +55,16 @@ class MyGoodsPanel extends StatelessWidget {
               Text(
                 '$total total',
                 style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: () => showAllPlayersStands(context),
+                icon: const Icon(Icons.people_outline, size: 18),
+                label: const Text('All players'),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
               ),
             ],
           ),
